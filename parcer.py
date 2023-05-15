@@ -48,5 +48,5 @@ def request_by_Id(cveId):
     vuln_product_data = tech_part['configurations']
     data['useful_urls'] = parse_by_Id(cveId)
     data['vuln_conf'] = parse_vuln_conf(vuln_product_data)
-    print(data)
-request_by_Id("CVE-2021-44228")
+    return data
+
