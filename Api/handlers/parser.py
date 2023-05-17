@@ -77,15 +77,31 @@ def parce_data_from_res(res, cveId):
     return data_assmbly
 
 
+def convert_date(date_string):
+    input_format = "%d.%m.%Y"
+    output_format = "%Y-%m-%dT%H:%M:%S.%f"
+    date_obj = datetime.strptime(date_string, input_format)
+    converted_date = datetime.strftime(date_obj, output_format)
+    return converted_date
 
-def request_by_Id(cveId):
-    print(cveId)
-    query = {"cveId": cveId}
-    epss_query = {"cve": cveId}
+
+def request_by_Id(cve_id):
+    print(cve_id)
+    query = {"cveId": cve_id}
+    epss_query = {"cve": cve_id}
     response = requests.request('GET', base_vuln_api_url, params=query, timeout=5).json()
     epss_response = requests.request('GET', base_epss_api_url, params=epss_query, timeout=5).json()
-    data = parce_data_from_res(response, cveId)
+    data = parce_data_from_res(response, cve_id)
     return data
+
+
+def parse_ids_from_res(res):
+    ids = []
+    for cve in res['vulnerabilities']:
+        tech_part = cve['cve']
+        ids.append(tech_part['id'])
+    return ids
+
 
 def request_by_date(date_start, date_end):
     if date_end==None:
@@ -96,5 +112,5 @@ def request_by_date(date_start, date_end):
         print(date_start)
     query = {"pubStartDate": str(date_start), "pubEndDate": str(date_end)}
     response = requests.request('GET', base_vuln_api_url, params=query, timeout=10).json()
-    data = parce_data_from_res(response, None)
-    return(data)
+    data = parse_ids_from_res(response)
+    return data
