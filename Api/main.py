@@ -1,5 +1,5 @@
 from flask import Flask, request
-from Api.handlers import parser
+from handlers import parser
 import sqlite3
 import requests
 import datetime

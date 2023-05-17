@@ -6,5 +6,7 @@ class TextTranslation:
         self.to_lang = "ru"
 
     def translate(self, text: str) -> str:
-        translated_text = GoogleTranslator(source='auto', target=self.to_lang).translate(text=text)
+        if text == "None":
+            return "None"
+        translated_text = GoogleTranslator(source='auto', target=self.to_lang).translate(text=text[:5000])
         return translated_text
