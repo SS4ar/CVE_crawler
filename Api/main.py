@@ -4,6 +4,9 @@ import sqlite3
 import requests
 import datetime
 import schedule
+import threading
+import time
+
 
 app = Flask(__name__)
 db = "users.db"
@@ -41,10 +44,24 @@ def check_user_wishes():
         for cve in new_cves:
             response = parser.request_by_Id(cve)
             cvss_score = response['cvss3']['baseScore']
-            if (wish in response for wish in wishes) and cvss > cvss_score:
-                #send notification
+            url = 'https://api.telegram.org/bot6097752660:AAHEfco55h-eA_lBcKwN_oxomcSO-ga09LE/sendMessage?chat_id=' + chat_id + '''&text=🔔 Уведомление по подписке на уязвимости
 
+            В базе CVE появилась новая уязвимость под номером''' + cve + '''
+
+            Чтобы отключить подписку, перейдите в Меню -> Подписка на уведомления -> Отключить подписку'''
+            if (wish in response for wish in wishes) and cvss > cvss_score:
+                request.get(url)
+            elif wishes == None or cvss == None:
+                request.get(url)
     conn.close()
+
+def run_scheduler():
+    # Определяем задачу для выполнения каждые 6 часов
+    schedule.every(6).hours.do(check_user_wishes)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 def register_user(chat_id):
     conn = sqlite3.connect(db)
@@ -112,6 +129,8 @@ def handle_data1(date_start, date_end):
 
 
 def start_api():
+    scheduler_thread = threading.Thread(target=run_scheduler)
+    scheduler_thread.start()
     app.run(debug=True)
     get_new_cves()
 
