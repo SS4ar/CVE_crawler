@@ -2,10 +2,12 @@ from Bot.keyboards import reply
 from Bot.keyboards import inline
 
 from aiogram import Dispatcher, Bot
-from aiogram.types import Message, User
+from aiogram.types import Message, User, CallbackQuery
 
-from Bot.utils.cve_finder import CVEFinder, CVE
+from Bot.utils.cve_finder import CVEFinder, CVE, CVEMessageFormatter
 from Bot.utils.translator import TextTranslation
+
+from Bot.keyboards.inline import CVECallbackActionsStatus
 
 
 async def __main_menu(msg: Message) -> None:
@@ -35,17 +37,123 @@ async def __find_cve_by_id(msg: Message) -> None:
     bot: Bot = msg.bot
     user: User = msg.from_user
 
-    found_cve: CVE = CVEFinder().get_by_id(msg.text)
+    loading_msg: Message = await bot.send_message(chat_id=user.id, text="⏳ Ищу информацию об уязвимости...")
 
-    response_text = f"<b>✅ Уязвимость найдена!</b>\n\n" \
-               f"<b><u>{found_cve.id}</u></b>\n" \
-               f"🕐 Дата обнаружения: {found_cve.pub_date_time}\n\n" \
-               f"🇺🇸 Описание на EN: {found_cve.name}\n\n" \
-               f"🇷🇺 Описание на RU: {TextTranslation().translate(text=found_cve.name)}"
+    try:
+        found_cve: CVE = CVEFinder().get_by_id(msg.text)
+    except FileNotFoundError as ex:
+        await bot.edit_message_text(chat_id=user.id,
+                                    message_id=loading_msg.message_id,
+                                    text="⚠️  Уязвимость не найдена!")
+        return
 
-    await bot.send_message(chat_id=user.id,
-                           text=response_text,
-                           reply_markup=inline.KB_CVE_PARAMS)
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    response_text = cve_message_formatter.get_base_message()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=loading_msg.message_id,
+                                text=response_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve))
+
+
+async def __show_actions(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+    old_message = query.message
+
+    found_cve: CVE = CVEFinder().get_by_id(callback_data['cve'])
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    message_text = cve_message_formatter.get_base_message()
+
+    message_text += cve_message_formatter.get_recommended_actions()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=old_message.message_id,
+                                text=message_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve,
+                                                                     callback_actions_status=CVECallbackActionsStatus(
+                                                                         recommended_actions=True)))
+
+
+async def __show_severity2x(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+    old_message = query.message
+
+    found_cve: CVE = CVEFinder().get_by_id(callback_data['cve'])
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    message_text = cve_message_formatter.get_base_message()
+
+    message_text += CVEMessageFormatter(cve=found_cve).get_severity2x()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=old_message.message_id,
+                                text=message_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve,
+                                                                     callback_actions_status=CVECallbackActionsStatus(
+                                                                         severity_2x=True)))
+
+
+async def __show_severity3x(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+    old_message = query.message
+
+    found_cve: CVE = CVEFinder().get_by_id(callback_data['cve'])
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    message_text = cve_message_formatter.get_base_message()
+
+    message_text += CVEMessageFormatter(cve=found_cve).get_severity3x()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=old_message.message_id,
+                                text=message_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve,
+                                                                     callback_actions_status=CVECallbackActionsStatus(
+                                                                         severity_3x=True)))
+
+
+async def __show_epss_rating(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+    old_message = query.message
+
+    found_cve: CVE = CVEFinder().get_by_id(callback_data['cve'])
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    message_text = cve_message_formatter.get_base_message()
+
+    message_text += CVEMessageFormatter(cve=found_cve).get_epss_rating()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=old_message.message_id,
+                                text=message_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve,
+                                                                     callback_actions_status=CVECallbackActionsStatus(
+                                                                         epss_rating=True)))
+
+async def __show_useful_urls(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+    old_message = query.message
+
+    found_cve: CVE = CVEFinder().get_by_id(callback_data['cve'])
+    cve_message_formatter: CVEMessageFormatter = CVEMessageFormatter(cve=found_cve)
+
+    message_text = cve_message_formatter.get_base_message()
+
+    message_text += CVEMessageFormatter(cve=found_cve).get_useful_urls()
+
+    await bot.edit_message_text(chat_id=user.id,
+                                message_id=old_message.message_id,
+                                text=message_text,
+                                reply_markup=inline.get_cve_keyboard(found_cve,
+                                                                     callback_actions_status=CVECallbackActionsStatus(
+                                                                         useful_urls=True)))
 
 
 async def __vuln_subscription(msg: Message) -> None:
@@ -74,3 +182,9 @@ def register_user_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(__vuln_finder_menu, lambda message: message.text == "🔍 Поиск уязвимостей")
     dp.register_message_handler(__vuln_subscription, lambda message: message.text == "🔔 Подписка на уведомления")
     dp.register_message_handler(__profile, lambda message: message.text == "👤 Профиль")
+
+    dp.register_callback_query_handler(__show_actions, inline.cve_callbacks.filter(action="cve_show_actions"))
+    dp.register_callback_query_handler(__show_severity2x, inline.cve_callbacks.filter(action="cve_show_severity2x"))
+    dp.register_callback_query_handler(__show_severity3x, inline.cve_callbacks.filter(action="cve_show_severity3x"))
+    dp.register_callback_query_handler(__show_epss_rating, inline.cve_callbacks.filter(action="cve_show_epss_rating"))
+    dp.register_callback_query_handler(__show_useful_urls, inline.cve_callbacks.filter(action="cve_show_useful_urls"))
