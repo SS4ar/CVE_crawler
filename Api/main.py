@@ -1,5 +1,5 @@
-from flask import Flask, request
-from parcer import  request_by_Id
+from flask import Flask
+from handlers import parser
 
 app = Flask(__name__)
 
@@ -11,10 +11,13 @@ def hello():
 
 @app.route('/api/cve/<string:cve_numb>', methods=['GET'])
 def handle_data(cve_numb):
-    data = request_by_Id(cve_numb)
+    data = parser.request_by_Id(cve_numb)
     return data
 
 
+def start_api():
+    app.run(debug=True)
+
 
 if __name__ == '__main__':
-    app.run()
+    start_api()
