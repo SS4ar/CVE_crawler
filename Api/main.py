@@ -1,11 +1,12 @@
 from flask import Flask, request
 from Api.handlers import parser
-import sqlite3
+import psycopg2
 import requests
 import datetime
 import schedule
 import threading
 import time
+import telebot
 
 
 app = Flask(__name__)
@@ -24,7 +25,6 @@ def get_new_cves():
     if response.status_code == 200:
         cve_data = response.json()
         data = parser.parse_ids_from_res(cve_data)
-        print(data)
         return data
     else:
         print('Ошибка при получении новых CVE:', response.status_code)
@@ -32,66 +32,85 @@ def get_new_cves():
 
 
 def check_user_wishes():
+    bot = telebot.TeleBot(token='6097752660:AAHEfco55h-eA_lBcKwN_oxomcSO-ga09LE')
     new_cves = get_new_cves()
-    conn = sqlite3.connect('users.db')
+    conn = psycopg2.connect(database="postgres", user="postgres", password="1488", host="localhost", port="5432")
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users")
     users = cursor.fetchall()
     for user in users:
-        chat_id = user['chatid']
-        wishes = user['wishes'].split(';')
-        cvss = user['cvss']
+        chat_id = user[1]
+        wishes = user[2]
+        if wishes != None:
+            wishes = user[2].split(';')
+        cvss = user[3]
         for cve in new_cves:
             response = parser.request_by_Id(cve)
-            cvss_score = response['cvss3']['baseScore']
-            url = 'https://api.telegram.org/bot6097752660:AAHEfco55h-eA_lBcKwN_oxomcSO-ga09LE/sendMessage?chat_id=' + chat_id + '''&text=🔔 Уведомление по подписке на уязвимости
+            cvss_score = 0
+            if 'cvss3' in response[0] and response[0]['cvss3'] != None:
+                cvss_score = response[0]['cvss3']['baseScore']
+            elif 'cvss2' in response[0] and response[0]['cvss2'] != None:
+                cvss_score = response[0]['cvss2']
+            else:
+                cvss_score = 0
+            print(cvss_score)
+            text ='''🔔<u><b>Уведомление по подписке на уязвимости</b></u>
+            
+В базе CVE появилась новая уязвимость под номером<b> ''' + cve + '''</b>
 
-            В базе CVE появилась новая уязвимость под номером''' + cve + '''
-
-            Чтобы отключить подписку, перейдите в Меню -> Подписка на уведомления -> Отключить подписку'''
-            if (wish in response for wish in wishes) and cvss > cvss_score:
-                request.get(url)
-            elif wishes == None or cvss == None:
-                request.get(url)
+Чтобы отключить подписку, перейдите в Меню -> Подписка на уведомления -> Отключить подписку'''
+            if wishes != None and cvss != None:
+                if (wish in response for wish in wishes) and cvss > cvss_score:
+                    try:
+                        bot.send_message(chat_id, text, parse_mode='HTML')
+                    except Exception:
+                        continue
+            elif wishes[0] == 'ALL' and cvss == 10:
+                try:
+                    bot.send_message(chat_id, text, parse_mode='HTML')
+                except Exception:
+                    continue
+            time.sleep(15)
     conn.close()
 
+
 def run_scheduler():
-    # Определяем задачу для выполнения каждые 6 часов
     schedule.every(6).hours.do(check_user_wishes)
 
     while True:
         schedule.run_pending()
         time.sleep(1)
 
+
 def register_user(chat_id):
-    conn = sqlite3.connect(db)
+    conn = psycopg2.connect(database="postgres", user="postgres", password="1488", host="localhost", port="5432")
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE chatid=?", (chat_id,))
+    cursor.execute("SELECT * FROM users WHERE chatid = %s", (chat_id,))
     existing_user = cursor.fetchone()
     if not existing_user:
-        cursor.execute("INSERT INTO users (chatid, wishes, cvss) VALUES (?, ?, ?)", (chat_id, None))
+        cursor.execute("INSERT INTO users (chatid, wishes, cvss) VALUES (%s, %s, %s)", (chat_id, None, None))
         conn.commit()
     conn.close()
 
 
 def update_wishes(chat_id, new_wishes, new_cvss):
-    conn = sqlite3.connect(db)
+    conn = psycopg2.connect(database="postgres", user="postgres", password="1488", host="localhost", port="5432")
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE chatid=?", (chat_id,))
+    cursor.execute("SELECT * FROM users WHERE chatid = %s", (chat_id,))
     existing_user = cursor.fetchone()
     if existing_user:
-        cursor.execute("UPDATE users SET wishes=?,cvss=? WHERE chatid=?", (new_wishes, new_cvss, chat_id,))
+        cursor.execute("UPDATE users SET wishes = %s, cvss = %s WHERE chatid = %s", (new_wishes, new_cvss, chat_id,))
         conn.commit()
     conn.close()
 
 
-@app.route('/api/cve/update_wishes', methods=['POST'])
+@app.route('/api/cve/update_wishes', methods=['PUT'])
 def handle_update_wishes():
     data = request.get_json()
     chat_id = data['chat_id']
-    new_wishes = data['new_wishes']
-
-    update_wishes(chat_id, new_wishes)
+    new_wishes = data['wishes']
+    new_cvss = data['cvss']
+    update_wishes(chat_id, new_wishes, new_cvss)
 
     return 'Wishes updated successfully'
 
@@ -118,7 +137,7 @@ def handle_data(cve_numb):
 
 @app.route('/api/cve/sortbydate/<string:date_start>/<string:date_end>')
 def handle_data1(date_start, date_end):
-    date_start =parser.convert_date(date_start)
+    date_start = parser.convert_date(date_start)
     date_end = parser.convert_date(date_end)
     try:
         json_data = parser.request_by_date(date_start, date_end)
@@ -132,9 +151,7 @@ def start_api():
     scheduler_thread = threading.Thread(target=run_scheduler)
     scheduler_thread.start()
     app.run(debug=True)
-    get_new_cves()
 
 
 if __name__ == '__main__':
-    get_new_cves()
     start_api()
