@@ -23,7 +23,7 @@ class CVE:
     def __str__(self):
         return f"Vulnerability ID: {self.id} with Name: {self.name}"
 
-    def convert_to_json(self):
+    def convert_to_json(self) -> str:
         cve_dict = {
             'actions': self.actions,
             'cvss2': self.cvss2,

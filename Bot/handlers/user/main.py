@@ -2,7 +2,7 @@ from Bot.keyboards import reply
 from Bot.keyboards import inline
 
 from aiogram import Dispatcher, Bot
-from aiogram.types import Message, User
+from aiogram.types import Message, User, CallbackQuery
 
 from Bot.utils.cve_finder import CVEFinder, CVE
 from Bot.utils.translator import TextTranslation
@@ -38,14 +38,24 @@ async def __find_cve_by_id(msg: Message) -> None:
     found_cve: CVE = CVEFinder().get_by_id(msg.text)
 
     response_text = f"<b>✅ Уязвимость найдена!</b>\n\n" \
-               f"<b><u>{found_cve.id}</u></b>\n" \
-               f"🕐 Дата обнаружения: {found_cve.pub_date_time}\n\n" \
-               f"🇺🇸 Описание на EN: {found_cve.name}\n\n" \
-               f"🇷🇺 Описание на RU: {TextTranslation().translate(text=found_cve.name)}"
+                    f"<b><u>{found_cve.id}</u></b>\n" \
+                    f"🕐 Дата обнаружения: {found_cve.pub_date_time}\n\n" \
+                    f"🇺🇸 Описание на EN: {found_cve.name}\n\n" \
+                    f"🇷🇺 Описание на RU: {TextTranslation().translate(text=found_cve.name)}"
 
     await bot.send_message(chat_id=user.id,
                            text=response_text,
-                           reply_markup=inline.KB_CVE_PARAMS)
+                           reply_markup=inline.get_cve_keyboard(found_cve))
+
+
+async def __show_actions(query: CallbackQuery, callback_data: dict) -> None:
+    bot: Bot = query.bot
+    user: User = query.from_user
+
+    await bot.send_message(chat_id=user.id,
+                           text=f"<b>Рекомендованные действия:</b>\n\n"
+                                f"EN: {callback_data}",
+                           reply_markup=reply.KB_BACK_TO_MENU)
 
 
 async def __vuln_subscription(msg: Message) -> None:
@@ -74,3 +84,5 @@ def register_user_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(__vuln_finder_menu, lambda message: message.text == "🔍 Поиск уязвимостей")
     dp.register_message_handler(__vuln_subscription, lambda message: message.text == "🔔 Подписка на уведомления")
     dp.register_message_handler(__profile, lambda message: message.text == "👤 Профиль")
+
+    dp.register_callback_query_handler(__show_actions, inline.cve_callbacks.filter(action="cve_show_actions"))

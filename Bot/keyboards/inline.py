@@ -1,10 +1,14 @@
 from typing import Final
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.callback_data import CallbackData
 
-KB_CVE_PARAMS: Final = InlineKeyboardMarkup(1)
-KB_CVE_PARAMS.add(
-    InlineKeyboardButton("Показать рекомендованные действия", callback_data="cve_show_actions")
-)
-KB_CVE_PARAMS.add(
-    InlineKeyboardButton("Показать полезные ссылки", callback_data="cve_show_useful_urls")
-)
+from Bot.utils.cve_finder import CVEFinder, CVE
+
+cve_callbacks = CallbackData("vote", "action", "cve")
+
+
+def get_cve_keyboard(cve: CVE):
+    return InlineKeyboardMarkup(1).row(
+        InlineKeyboardButton('Показать рекомендованные действия', callback_data=cve_callbacks.new(action="cve_show_actions", cve=cve)),
+        InlineKeyboardButton('Показать полезные ссылки', callback_data=cve_callbacks.new(action="cve_show_useful_urls", cve=cve))
+    )
