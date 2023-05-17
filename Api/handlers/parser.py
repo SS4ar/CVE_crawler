@@ -1,4 +1,5 @@
 import requests
+import json
 from datetime import datetime, date
 
 
@@ -24,7 +25,7 @@ def parse_vuln_conf(vuln_confs):
             for cpeMatch in node['cpeMatch']:
                 if cpeMatch['vulnerable'] == True:
                     nodes.append(cpeMatch['criteria'])
-    return(nodes)
+    return nodes
 
 def parce_data_from_res(res, cveId):
     data_assmbly = []
@@ -73,7 +74,7 @@ def parce_data_from_res(res, cveId):
         data['useful_urls'] = parse_by_Id(cveId)
         if vuln_product_data!=None:
             data['vuln_conf'] = parse_vuln_conf(vuln_product_data)
-        data_assmbly.append(data)
+        data_assmbly.append(json.dumps(data))
     return data_assmbly
 
 
@@ -86,13 +87,12 @@ def convert_date(date_string):
 
 
 def request_by_Id(cve_id):
-    print(cve_id)
     query = {"cveId": cve_id}
     epss_query = {"cve": cve_id}
     response = requests.request('GET', base_vuln_api_url, params=query, timeout=5).json()
     epss_response = requests.request('GET', base_epss_api_url, params=epss_query, timeout=5).json()
     data = parce_data_from_res(response, cve_id)
-    return data
+    return str(data)
 
 
 def parse_ids_from_res(res):
@@ -106,11 +106,9 @@ def parse_ids_from_res(res):
 def request_by_date(date_start, date_end):
     if date_end==None:
         date_end = datetime.now().isoformat()
-        print(date_end)
     if date_start==None:
         date_start = date.today().isoformat()
-        print(date_start)
     query = {"pubStartDate": str(date_start), "pubEndDate": str(date_end)}
     response = requests.request('GET', base_vuln_api_url, params=query, timeout=10).json()
     data = parse_ids_from_res(response)
-    return data
+    return str(data)
