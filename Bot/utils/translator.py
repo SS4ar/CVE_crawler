@@ -1,3 +1,5 @@
+import json
+
 from deep_translator import GoogleTranslator
 
 

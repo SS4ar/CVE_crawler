@@ -1,5 +1,6 @@
 import requests
 import json
+import ast
 
 import Bot.config
 from Bot.utils.translator import TextTranslation
@@ -7,8 +8,6 @@ from Bot.utils.translator import TextTranslation
 
 class CVE:
     def __init__(self, parsed_data):
-        print(parsed_data)
-        parsed_data = parsed_data[0]
         print(parsed_data)
         self.actions = str(parsed_data['actions'])
         self.cvss2 = parsed_data['cvss2']
@@ -48,13 +47,18 @@ class CVEFinder:
     def __request_from_parser(self, cve_id) -> str:
         url = self.base_url + cve_id
         response = requests.get(url)
+        print(response.text)
         return response.text
 
     def get_by_id(self, cve_id) -> CVE:
         response_data = self.__request_from_parser(cve_id)
-        parsed_data = json.loads(response_data)
-        if len(parsed_data) == 0:
+        response_data = ast.literal_eval(response_data)
+
+        if len(response_data) == 0:
             raise FileNotFoundError
+
+        parsed_data = json.loads(response_data[0])
+
         cve = CVE(parsed_data)
         return cve
 
@@ -65,7 +69,7 @@ class CVEMessageFormatter:
 
     def get_base_message(self) -> str:
         base_message = f"<b>✅ Уязвимость найдена!</b>\n\n" \
-                       f"<b><u>{self.cve.id}</u></b>\n" \
+                       f"<b><u><a href='https://nvd.nist.gov/vuln/detail/{self.cve.id}'>{self.cve.id}</a></u></b>\n" \
                        f"🕐 Дата публикации: {self.cve.pub_date_time}\n\n" \
                        f"🇺🇸 Описание на EN: {self.cve.name}\n\n" \
                        f"🇷🇺 Описание на RU: {TextTranslation().translate(text=self.cve.name)}"

@@ -1,3 +1,6 @@
+import requests
+
+from Bot.config import API_URL
 from Bot.keyboards import reply
 from Bot.keyboards import inline
 
@@ -17,6 +20,15 @@ async def other_messages(msg: Message) -> None:
 async def __start(msg: Message) -> None:
     bot: Bot = msg.bot
     user: User = msg.from_user
+
+    reg_request_url = API_URL + "register"
+    response = requests.post(url=reg_request_url,
+                             json={"chat_id": f"{user.id}"},
+                             headers={
+                                 'Content-type': 'application/json',
+                                 'Accept': 'application/json'
+                             })
+    print(response)
 
     await bot.send_message(chat_id=user.id,
                            text=f"Добро пожаловать! 👋\n\n"

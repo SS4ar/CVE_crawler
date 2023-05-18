@@ -1,13 +1,17 @@
+import requests
+
 from Bot.keyboards import reply
 from Bot.keyboards import inline
+from Bot.config import API_URL
 
 from aiogram import Dispatcher, Bot
 from aiogram.types import Message, User, CallbackQuery
+from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from Bot.utils.cve_finder import CVEFinder, CVE, CVEMessageFormatter
 from Bot.utils.translator import TextTranslation
 
-from Bot.keyboards.inline import CVECallbackActionsStatus
+from Bot.keyboards.inline import CVECallbackActionsStatus, SubscriptionCallbackStatus
 
 
 async def __main_menu(msg: Message) -> None:
@@ -29,7 +33,8 @@ async def __vuln_finder_menu(msg: Message) -> None:
                                  f"Для того, чтобы произвести поиск уязвимости по номеру CVE "
                                  f"произведите запрос в следующей форме:\n"
                                  f"<code class=\"language-python\"><b>CVE-****-****</b></code>\n"
-                                 f"Где <code class=\"language-python\">*</code> - любое число",
+                                 f"Где <code class=\"language-python\">*</code> - любое число\n\n"
+                                 f"<b>Пример уязвимости для тестирования бота: CVE-2021-3560</b>",
                          reply_markup=reply.VULN_FINDER_MENU)
 
 
@@ -136,6 +141,7 @@ async def __show_epss_rating(query: CallbackQuery, callback_data: dict) -> None:
                                                                      callback_actions_status=CVECallbackActionsStatus(
                                                                          epss_rating=True)))
 
+
 async def __show_useful_urls(query: CallbackQuery, callback_data: dict) -> None:
     bot: Bot = query.bot
     user: User = query.from_user
@@ -156,12 +162,77 @@ async def __show_useful_urls(query: CallbackQuery, callback_data: dict) -> None:
                                                                          useful_urls=True)))
 
 
+# class VulnPreference(StatesGroup):
+#     key_word = State()
+
+
 async def __vuln_subscription(msg: Message) -> None:
     bot: Bot = msg.bot
     user: User = msg.from_user
 
     await bot.send_message(chat_id=user.id,
-                           text=f"Функция ещё не реализована.",
+                           text=f"<b><u>🔔 Подписка на уведомления об уязвимостях</u></b>\n\n"
+                                f"При включенной подписке вам будут приходить уведомления при появлении "
+                                f"новой уязвимости.\n\n"
+                                f"Указывайте предпочтения для получения только нужных уязвимостей",
+                           reply_markup=inline.get_subscription_keyboard())
+
+
+async def __enable_subscription(msg: Message) -> None:
+    bot: Bot = msg.bot
+    user: User = msg.from_user
+
+    reg_request_url = API_URL + "update_wishes"
+    response = requests.put(url=reg_request_url,
+                             json={"chat_id": f"{user.id}",
+                                   "wishes": "ALL",
+                                   "cvss": 10},
+                             headers={
+                                 'Content-type': 'application/json',
+                                 'Accept': 'application/json'
+                             })
+    print(response)
+
+    await bot.send_message(chat_id=user.id,
+                           text=f"<b>Подписка успешно включена</b>",
+                           reply_markup=reply.KB_BACK_TO_MENU)
+
+
+async def __disable_subscription(msg: Message) -> None:
+    bot: Bot = msg.bot
+    user: User = msg.from_user
+
+    reg_request_url = API_URL + "update_wishes"
+    response = requests.put(url=reg_request_url,
+                             json={"chat_id": f"{user.id}",
+                                   "wishes": "",
+                                   "cvss": 0},
+                             headers={
+                                 'Content-type': 'application/json',
+                                 'Accept': 'application/json'
+                             })
+    print(response)
+
+    await bot.send_message(chat_id=user.id,
+                           text=f"<b>Подписка успешно отключена</b>",
+                           reply_markup=reply.KB_BACK_TO_MENU)
+
+
+async def __sub_set_keyword(msg: Message) -> None:
+    bot: Bot = msg.bot
+    user: User = msg.from_user
+
+    await bot.send_message(chat_id=user.id,
+                           text=f"<b>Введите ключевое слово</b>",
+                           reply_markup=reply.KB_BACK_TO_MENU)
+
+
+async def __sub_set_min_rating(msg: Message) -> None:
+    bot: Bot = msg.bot
+    user: User = msg.from_user
+
+    await bot.send_message(chat_id=user.id,
+                           text=f"<b>Введите минимальный рейтинг (от 0 до 10)</b>",
                            reply_markup=reply.KB_BACK_TO_MENU)
 
 
@@ -188,3 +259,12 @@ def register_user_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(__show_severity3x, inline.cve_callbacks.filter(action="cve_show_severity3x"))
     dp.register_callback_query_handler(__show_epss_rating, inline.cve_callbacks.filter(action="cve_show_epss_rating"))
     dp.register_callback_query_handler(__show_useful_urls, inline.cve_callbacks.filter(action="cve_show_useful_urls"))
+
+    dp.register_callback_query_handler(__enable_subscription,
+                                       inline.subscription_callbacks.filter(action="sub_enable"))
+    dp.register_callback_query_handler(__disable_subscription,
+                                       inline.subscription_callbacks.filter(action="sub_disable"))
+    dp.register_callback_query_handler(__sub_set_keyword,
+                                       inline.subscription_callbacks.filter(action="sub_set_keyword"))
+    dp.register_callback_query_handler(__sub_set_min_rating,
+                                       inline.subscription_callbacks.filter(action="sub_set_min_rating"))
