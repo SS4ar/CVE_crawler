@@ -8,6 +8,11 @@ import threading
 import time
 import telebot
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
 app = Flask(__name__)
 
 
@@ -30,7 +35,7 @@ def get_new_cves():
 
 
 def check_user_wishes():
-    bot = telebot.TeleBot(token='6097752660:AAHEfco55h-eA_lBcKwN_oxomcSO-ga09LE')
+    bot = telebot.TeleBot(os.getenv('BOT_TOKEN'))
     new_cves = get_new_cves()
     conn = psycopg2.connect(database="postgres", user="postgres", password="1488", host="localhost", port="5432")
     cursor = conn.cursor()
